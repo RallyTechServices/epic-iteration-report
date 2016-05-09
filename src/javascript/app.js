@@ -7,7 +7,7 @@ Ext.define("TSEpicIterationReport", {
     layout:'border',
     
     items: [
-        {xtype:'container',itemId:'selector_box',region:'north'},
+        {xtype:'container',itemId:'selector_box',region:'north', layout: 'hbox'},
         {xtype:'container',itemId:'display_box', region:'center', layout:'fit'}
     ],
 
@@ -16,18 +16,40 @@ Ext.define("TSEpicIterationReport", {
     },
 
     launch: function() {
-        this.down('#selector_box').add({
+        this._addSelectors(this.down('#selector_box'));
+    },
+    
+    _addSelectors: function(container) {
+        container.add({
             xtype:'rallyiterationcombobox',
             listeners: { 
                 scope: this,
                 change: this._updateData
             }
         });
+        
+        container.add({ xtype:'container', flex: 1});
+        
+        container.add({
+            xtype:'rallybutton',
+            itemId:'export_button',
+            cls: 'secondary',
+            text: '<span class="icon-export"> </span>',
+            disabled: true,
+            listeners: {
+                scope: this,
+                click: function() {
+                    this._export();
+                }
+            }
+        });
+        
     },
     
     _updateData: function(cb) {
         var iteration = cb.getRecord();
-        
+        this.down('#export_button').setDisabled(true);
+
         Deft.Chain.pipeline([
             function() { return this._getStoriesInIteration(iteration); },
             this._arrangeRecordsByProjectAndEpic,
@@ -35,6 +57,7 @@ Ext.define("TSEpicIterationReport", {
         ],this).then({
             scope: this,
             success: function(rows) {
+                this.display_rows = rows;
                 this._makeGrid(rows);
             },
             failure: function(msg) {
@@ -58,6 +81,8 @@ Ext.define("TSEpicIterationReport", {
             columnCfgs: this._getColumns(),
             showRowActionsColumn: false
         });
+        
+        this.down('#export_button').setDisabled(false);
     },
     
     _getColumns: function() {
@@ -182,34 +207,38 @@ Ext.define("TSEpicIterationReport", {
         });
         return deferred.promise;
     },
-
-    _loadAStoreWithAPromise: function(model_name, model_fields){
-        var deferred = Ext.create('Deft.Deferred');
-        var me = this;
-        this.logger.log("Starting load:",model_name,model_fields);
-          
-        Ext.create('Rally.data.wsapi.Store', {
-            model: model_name,
-            fetch: model_fields
-        }).load({
-            callback : function(records, operation, successful) {
-                if (successful){
-                    deferred.resolve(this);
-                } else {
-                    me.logger.log("Failed: ", operation);
-                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
-                }
-            }
-        });
-        return deferred.promise;
-    },
     
-    _displayGrid: function(store,field_names){
-        this.down('#display_box').add({
-            xtype: 'rallygrid',
-            store: store,
-            columnCfgs: field_names
-        });
+    _export: function(){
+        var me = this;
+        this.logger.log('_export');
+        
+        var grid = this.down('rallygrid');
+        var rows = this.display_rows;
+        
+        
+        this.logger.log('number of rows:', rows.length);
+        
+        if ( !grid && !rows ) { return; }
+        
+        var filename = 'epic-iteration-report.csv';
+
+        this.logger.log('saving file:', filename);
+        
+        this.setLoading("Generating CSV");
+        Deft.Chain.sequence([
+            function() { return Rally.technicalservices.FileUtilities.getCSVFromRows(this,grid,rows); } 
+        ]).then({
+            scope: this,
+            success: function(csv){
+                this.logger.log('got back csv ', csv.length);
+                if (csv && csv.length > 0){
+                    Rally.technicalservices.FileUtilities.saveCSVToFile(csv,filename);
+                } else {
+                    Rally.ui.notify.Notifier.showWarning({message: 'No data to export'});
+                }
+                
+            }
+        }).always(function() { me.setLoading(false); });
     },
     
     getOptions: function() {
