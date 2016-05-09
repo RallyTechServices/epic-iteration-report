@@ -99,6 +99,13 @@ Ext.define("TSEpicIterationReport", {
         }});
         
         columns.push({dataIndex:'PlanEstimate', text:'Sum of Estimates'});
+        
+        if ( this.getSetting('showEpicPercentage') ) {
+            columns.push({dataIndex:'EpicPercentage', text: 'Epic %', renderer: function(value, meta, record){
+                if ( !Ext.isNumber(value) || value < 0 ) { return "N/A"; }
+                return Ext.util.Format.number(value, '0.##') + "%";
+            }});
+        }
         columns.push({dataIndex:'c_ExtID01TPR', text:'ExtID: 01 - TPR'});
         
         return columns;
@@ -116,12 +123,21 @@ Ext.define("TSEpicIterationReport", {
                     return 1000 * size;
                 });
                 
+                var epic_size = 0;
+                var epic_percentage = -1;
+                
+                if ( epic && epic.LeafStoryPlanEstimateTotal > 0) {
+                    epic_size = 1000 * epic.LeafStoryPlanEstimateTotal;
+                    epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_size;
+                }
+                
                 var row = {
                     Project: project,
                     ProjectName: project.Name,
                     Epic: epic,
                     EpicName: epic.Name,
                     EpicOID: epic_oid,
+                    EpicPercentage: epic_percentage,
                     Records: epic_set.records,
                     PlanEstimate: Ext.Array.sum(plan_estimates) / 1000,
                     c_ExtID01TPR: epic.c_ExtID01TPR
@@ -173,7 +189,7 @@ Ext.define("TSEpicIterationReport", {
         
         var config = {
             model:'HierarchicalRequirement',
-            fetch:['FormattedID','Name','PlanEstimate','Project','Feature','Parent','ObjectID','c_ExtID01TPR'],
+            fetch:['FormattedID','Name','PlanEstimate','Project','Feature','Parent','ObjectID','c_ExtID01TPR','LeafStoryPlanEstimateTotal'],
             filters: filters,
             limit: Infinity
         };
@@ -249,6 +265,20 @@ Ext.define("TSEpicIterationReport", {
                 scope: this
             }
         ];
+    },
+    
+    getSettingsFields: function() {
+        var check_box_margins = '0 0 10 10';
+        
+        
+        return [{
+            name: 'showEpicPercentage',
+            xtype: 'rallycheckboxfield',
+            boxLabelAlign: 'after',
+            fieldLabel: '',
+            margin: check_box_margins,
+            boxLabel: 'Show percentage of story points for epic are in the sprint'
+        }];
     },
     
     _launchInfo: function() {
