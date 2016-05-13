@@ -3,10 +3,10 @@
 <head>
     <title>Epic Iteration Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Apr 25 2016 18:59:12 GMT-0700 (MST) -->
+    <!--  Build Date: Fri May 13 2016 16:13:43 GMT-0400 (EDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Apr 25 2016 18:59:12 GMT-0700 (MST)";
+        var APP_BUILD_DATE = "Fri May 13 2016 16:13:43 GMT-0400 (EDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
