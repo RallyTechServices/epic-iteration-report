@@ -113,23 +113,40 @@ Ext.define("TSEpicIterationReport", {
     
     _makeRows: function(hash) {
         var rows = [];
-        
+        var epic_plan_est_total = 0;
+        //Get total of PlanEstimates for all projects so that we can find the % for each row. 
+        Ext.Object.each(hash, function(project_oid, project_set){
+            var project = project_set.project;
+            Ext.Object.each(project_set.records, function(epic_oid, epic_set){
+                var plan_estimates = Ext.Array.map(epic_set.records, function(record){
+                    var size = record.get('PlanEstimate') || 0;
+                    return 1000 * size;
+                });
+                epic_plan_est_total += Ext.Array.sum(plan_estimates);
+            });
+        });
+
+        console.log('epic_plan_est_total',epic_plan_est_total);
+
         Ext.Object.each(hash, function(project_oid, project_set){
             var project = project_set.project;
             Ext.Object.each(project_set.records, function(epic_oid, epic_set){
                 var epic = epic_set.epic;
+                console.log('epic',epic);
                 var plan_estimates = Ext.Array.map(epic_set.records, function(record){
                     var size = record.get('PlanEstimate') || 0;
                     return 1000 * size;
                 });
                 
-                var epic_size = 0;
-                var epic_percentage = -1;
+                // var epic_size = 0;
+                // var epic_percentage = -1;
                 
-                if ( epic && epic.LeafStoryPlanEstimateTotal > 0) {
-                    epic_size = 1000 * epic.LeafStoryPlanEstimateTotal;
-                    epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_size;
-                }
+                // if ( epic && epic.LeafStoryPlanEstimateTotal > 0) {
+                //     epic_size = 1000 * epic.LeafStoryPlanEstimateTotal;
+                //     epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_size;
+                // }
+
+                epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_plan_est_total;
                 
                 var row = {
                     Project: project,
