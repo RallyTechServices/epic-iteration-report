@@ -3,12 +3,12 @@
 <head>
     <title>Epic Iteration Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon May 09 2016 16:08:28 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon May 23 2016 16:23:42 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon May 09 2016 16:08:28 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Mon May 23 2016 16:23:42 GMT-0700 (PDT)";
         var BUILDER = "jmartin";
-        var CHECKSUM = 16364608589;
+        var CHECKSUM = 16389631274;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -797,7 +797,8 @@ Ext.define("TSEpicIterationReport", {
             
         var default_config = {
             model: 'Defect',
-            fetch: ['ObjectID']
+            fetch: ['ObjectID'],
+            compact: false
         };
 
         me.setLoading('Loading ' + config.model + '...');

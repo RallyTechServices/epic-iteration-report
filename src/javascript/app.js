@@ -203,7 +203,8 @@ Ext.define("TSEpicIterationReport", {
             
         var default_config = {
             model: 'Defect',
-            fetch: ['ObjectID']
+            fetch: ['ObjectID'],
+            compact: false
         };
 
         me.setLoading('Loading ' + config.model + '...');
