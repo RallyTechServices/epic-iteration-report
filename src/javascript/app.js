@@ -98,6 +98,8 @@ Ext.define("TSEpicIterationReport", {
             );
         }});
         
+        columns.push({dataIndex:'EpicState', text:'State'});
+        
         columns.push({dataIndex:'PlanEstimate', text:'Sum of Estimates'});
         
         if ( this.getSetting('showEpicPercentage') ) {
@@ -146,13 +148,14 @@ Ext.define("TSEpicIterationReport", {
                 //     epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_size;
                 // }
 
-                epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_plan_est_total;
+                var epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_plan_est_total;
                 
                 var row = {
                     Project: project,
                     ProjectName: project.Name,
                     Epic: epic,
                     EpicName: epic.Name,
+                    EpicState: epic.State && epic.State._refObjectName,
                     EpicOID: epic_oid,
                     EpicPercentage: epic_percentage,
                     Records: epic_set.records,
@@ -206,7 +209,9 @@ Ext.define("TSEpicIterationReport", {
         
         var config = {
             model:'HierarchicalRequirement',
-            fetch:['FormattedID','Name','PlanEstimate','Project','Feature','Parent','ObjectID','c_ExtID01TPR','LeafStoryPlanEstimateTotal'],
+            fetch:['FormattedID','Name','PlanEstimate','Project','Feature',
+                'Parent','ObjectID','c_ExtID01TPR','LeafStoryPlanEstimateTotal',
+                'State'],
             filters: filters,
             limit: Infinity
         };

@@ -3,12 +3,12 @@
 <head>
     <title>Epic Iteration Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon May 23 2016 16:26:59 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Jul 18 2016 19:04:46 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon May 23 2016 16:26:59 GMT-0700 (PDT)";
-        var BUILDER = "jmartin";
-        var CHECKSUM = 17441684567;
+        var APP_BUILD_DATE = "Mon Jul 18 2016 19:04:46 GMT-0700 (PDT)";
+        var BUILDER = "curmudgeon";
+        var CHECKSUM = 17636246536;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -692,6 +692,8 @@ Ext.define("TSEpicIterationReport", {
             );
         }});
         
+        columns.push({dataIndex:'EpicState', text:'State'});
+        
         columns.push({dataIndex:'PlanEstimate', text:'Sum of Estimates'});
         
         if ( this.getSetting('showEpicPercentage') ) {
@@ -740,13 +742,14 @@ Ext.define("TSEpicIterationReport", {
                 //     epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_size;
                 // }
 
-                epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_plan_est_total;
+                var epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_plan_est_total;
                 
                 var row = {
                     Project: project,
                     ProjectName: project.Name,
                     Epic: epic,
                     EpicName: epic.Name,
+                    EpicState: epic.State && epic.State._refObjectName,
                     EpicOID: epic_oid,
                     EpicPercentage: epic_percentage,
                     Records: epic_set.records,
@@ -800,7 +803,9 @@ Ext.define("TSEpicIterationReport", {
         
         var config = {
             model:'HierarchicalRequirement',
-            fetch:['FormattedID','Name','PlanEstimate','Project','Feature','Parent','ObjectID','c_ExtID01TPR','LeafStoryPlanEstimateTotal'],
+            fetch:['FormattedID','Name','PlanEstimate','Project','Feature',
+                'Parent','ObjectID','c_ExtID01TPR','LeafStoryPlanEstimateTotal',
+                'State'],
             filters: filters,
             limit: Infinity
         };
