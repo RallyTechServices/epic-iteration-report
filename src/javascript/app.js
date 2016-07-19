@@ -4,19 +4,50 @@ Ext.define("TSEpicIterationReport", {
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     
-    layout:'border',
-    
-    items: [
-        {xtype:'container',itemId:'selector_box',region:'north', layout: 'hbox'},
-        {xtype:'container',itemId:'display_box', region:'center', layout:'fit'}
-    ],
-
     integrationHeaders : {
         name : "TSEpicIterationReport"
     },
+    
+    layout: 'border',
 
     launch: function() {
-        this._addSelectors(this.down('#selector_box'));
+       this._addComponents();
+    },
+    
+    _addComponents: function() {
+        this.removeAll();
+
+        this.headerContainer = this.add({
+            xtype:'container',
+            itemId:'header-ct',
+            region: 'north',
+            layout: {type: 'hbox'}
+        });
+        this.displayContainer = this.add({
+            xtype:'container',
+            region: 'center',
+            layout: 'fit',
+            itemId:'body-ct'
+        });
+
+        if ( this.getSetting('showScopeSelector') || this.getSetting('showScopeSelector') == "true" ) {
+            this.headerContainer.add({
+                xtype: 'tsmultiprojectpicker',
+                listeners: {
+                    change: function(picker, projects) {
+                        this._changeProjects(picker,projects);
+                        this._publishProjects();
+                    },
+                    scope: this
+                }
+            });
+            this.subscribe(this, 'requestProjects', this._publishProjects, this);
+        } else {
+            this.subscribe(this, 'projectsChanged', this._changeProjects, this);
+            this.publish('requestProjects', this);
+        }
+        this._addSelectors(this.headerContainer);
+        
     },
     
     _addSelectors: function(container) {
@@ -45,13 +76,38 @@ Ext.define("TSEpicIterationReport", {
         });
         
     },
+        
+    _changeProjects: function(picker,projects) {
+        this.projects = projects;
+        this.logger.log('Projects Changed', picker, projects);
+        
+        this.displayContainer.removeAll();
+        this._updateData();
+    },
+    
+    _publishProjects: function() {
+        this.publish('projectsChanged', this.down('tsmultiprojectpicker'), this.projects || []);  
+    },
     
     _updateData: function(cb) {
-        var iteration = cb.getRecord();
+        var iteration = null;
+        if ( this.down('rallyiterationcombobox') ) {
+            iteration = this.down('rallyiterationcombobox').getRecord();
+        }
+        
+        if ( Ext.isEmpty(iteration) ) { return; }
+        
         this.down('#export_button').setDisabled(true);
-
+        
+        var project_oids = [];
+        
+        if ( !Ext.isEmpty(this.projects) && this.projects.length > 0 ) {
+            project_oids = Ext.Array.map(this.projects, function(project){
+                return project.ObjectID;
+            });
+        }
         Deft.Chain.pipeline([
-            function() { return this._getStoriesInIteration(iteration); },
+            function() { return this._getStoriesInIteration(iteration, project_oids); },
             this._arrangeRecordsByProjectAndEpic,
             this._makeRows
         ],this).then({
@@ -67,7 +123,7 @@ Ext.define("TSEpicIterationReport", {
     },
     
     _makeGrid: function(rows) {
-        var container = this.down('#display_box');
+        var container = this.displayContainer;
         
         container.removeAll();
         
@@ -204,17 +260,31 @@ Ext.define("TSEpicIterationReport", {
         return records_by_project;
     },
     
-    _getStoriesInIteration: function(iteration) {
-        var filters = [{property:'Iteration.Name',value:iteration.get('Name')}];
+    _getStoriesInIteration: function(iteration, project_oids) {
+        var iteration_filters = Rally.data.wsapi.Filter.and(
+            [{property:'Iteration.Name',value:iteration.get('Name')}]
+        );
+        var project_filters = Rally.data.wsapi.Filter.or(
+            Ext.Array.map(project_oids, function(oid){
+                return {property:'Project.ObjectID',value:oid};
+            })
+        );
+        
         
         var config = {
             model:'HierarchicalRequirement',
             fetch:['FormattedID','Name','PlanEstimate','Project','Feature',
                 'Parent','ObjectID','c_ExtID01TPR','LeafStoryPlanEstimateTotal',
                 'State'],
-            filters: filters,
             limit: Infinity
         };
+        
+        if ( Ext.isEmpty(project_oids) || project_oids.length === 0 ) {
+            config.filters = iteration_filters;
+        } else {
+            config.context = { project: null };
+            config.filters = iteration_filters.and(project_filters);
+        }
         
         return this._loadWsapiRecords(config);
     },
@@ -291,10 +361,22 @@ Ext.define("TSEpicIterationReport", {
     },
     
     getSettingsFields: function() {
+        var type_filters = Rally.data.wsapi.Filter.or([
+            {property: 'TypePath', value: 'HierarchicalRequirement'},
+            {property: 'TypePath', operator: 'contains', value: 'PortfolioItem/'}
+        ]);
+        
         var check_box_margins = '0 0 10 10';
         
-        
         return [{
+            name: 'showScopeSelector',
+            xtype: 'rallycheckboxfield',
+            boxLabelAlign: 'after',
+            fieldLabel: '',
+            margin: check_box_margins,
+            boxLabel: 'Show Project Selector'
+        },
+        {
             name: 'showEpicPercentage',
             xtype: 'rallycheckboxfield',
             boxLabelAlign: 'after',
