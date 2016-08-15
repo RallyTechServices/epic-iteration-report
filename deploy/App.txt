@@ -3,12 +3,12 @@
 <head>
     <title>Epic Iteration Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon May 23 2016 16:26:59 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Aug 14 2016 19:01:17 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon May 23 2016 16:26:59 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Sun Aug 14 2016 19:01:17 GMT-0700 (PDT)";
         var BUILDER = "jmartin";
-        var CHECKSUM = 17441684567;
+        var CHECKSUM = 21644051877;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -592,6 +592,45 @@ Ext.define('Rally.technicalservices.FileUtilities', {
     }
 
 });
+Ext.override(Rally.ui.picker.MultiObjectPicker,{
+    createStore: function () {
+        var deferred = Ext.create('Deft.Deferred');
+        
+        var storeConfig = Ext.merge({
+            model: this.modelType,
+            filters: [{property:'EndDate',operator:'<',value:Rally.util.DateTime.toIsoString(new Date())}]
+        }, this.storeConfig);
+        
+        storeConfig.remoteGroup  = true;
+        storeConfig.remoteSort   = true;
+        storeConfig.remoteFilter = true;
+        
+
+        var interim_store = Ext.create('Rally.data.wsapi.Store',storeConfig);
+        
+        interim_store.load({ 
+            scope: this,
+            callback: function(records, operation,success){
+                this.store = Ext.create('Rally.data.custom.Store',{
+                    data: records,
+                    sorters: [{property:'EndDate',direction:'DESC'}]
+                });
+                
+                this.store.load({
+                    scope: this,
+                    callback: function(records, operation,success){
+                        this.relayEvents(this.store, ['datachanged']);
+                        
+                        deferred.resolve(this.store);                        
+                    }
+                });
+
+            }
+        })
+
+        return deferred.promise;
+    }
+});
 Ext.define("TSEpicIterationReport", {
     extend: 'Rally.app.App',
     componentCls: 'app',
@@ -615,10 +654,23 @@ Ext.define("TSEpicIterationReport", {
     
     _addSelectors: function(container) {
         container.add({
-            xtype:'rallyiterationcombobox',
+            xtype:'rallymultiobjectpicker',
+            modelType:'Iteration',
+            fieldLabel: 'Iteration:',
+            labelWidth: 55,
+            width: 200,
+            storeConfig: {
+                context: {
+                    projectScopeUp: false,
+                    projectScopeDown: false
+                },
+                fetch:['Name','ObjectID','StartDate','EndDate'],
+                sorters: [{property:'EndDate',direction:'DESC'}]
+
+            },
             listeners: { 
                 scope: this,
-                change: this._updateData
+                blur: this._updateData
             }
         });
         
@@ -641,11 +693,14 @@ Ext.define("TSEpicIterationReport", {
     },
     
     _updateData: function(cb) {
-        var iteration = cb.getRecord();
+        cb.collapse();
+        var iterations = cb.getValue();
         this.down('#export_button').setDisabled(true);
 
+        if ( iterations.length === 0 ) { return; }
+        
         Deft.Chain.pipeline([
-            function() { return this._getStoriesInIteration(iteration); },
+            function() { return this._getStoriesInIterations(iterations); },
             this._arrangeRecordsByProjectAndEpic,
             this._makeRows
         ],this).then({
@@ -666,14 +721,19 @@ Ext.define("TSEpicIterationReport", {
         container.removeAll();
         
         var store = Ext.create('Rally.data.custom.Store',{
-            data: rows
+            data: rows,
+            groupField: 'Iteration'
         });
         
         container.add({
             xtype:'rallygrid',
             store: store,
             columnCfgs: this._getColumns(),
-            showRowActionsColumn: false
+            showRowActionsColumn: false,
+            features: [{
+                ftype: 'groupingsummary',
+                groupHeaderTpl: '{groupValue}'
+            }]
         });
         
         this.down('#export_button').setDisabled(false);
@@ -702,110 +762,142 @@ Ext.define("TSEpicIterationReport", {
         }
         columns.push({dataIndex:'c_ExtID01TPR', text:'ExtID: 01 - TPR'});
         
+        columns.push({dataIndex:'Iteration',text:'Iteration'});
         return columns;
     },
     
-    _makeRows: function(hash) {
+    _makeRows: function(records_by_iteration_by_project) {
+        this.logger.log('records_by_iteration_by_project',records_by_iteration_by_project);
+
         var rows = [];
-        var epic_plan_est_total = 0;
         //Get total of PlanEstimates for all projects so that we can find the % for each row. 
-        Ext.Object.each(hash, function(project_oid, project_set){
-            var project = project_set.project;
-            Ext.Object.each(project_set.records, function(epic_oid, epic_set){
-                var plan_estimates = Ext.Array.map(epic_set.records, function(record){
-                    var size = record.get('PlanEstimate') || 0;
-                    return 1000 * size;
+        Ext.Object.each(records_by_iteration_by_project, function(iteration_name,hash){
+            var epic_plan_est_total = 0;
+            Ext.Object.each(hash, function(project_oid, project_set){
+                var project = project_set.project;
+                Ext.Object.each(project_set.records, function(epic_oid, epic_set){
+                    var plan_estimates = Ext.Array.map(epic_set.records, function(record){
+                        var size = record.get('PlanEstimate') || 0;
+                        return 1000 * size;
+                    });
+                    epic_plan_est_total += Ext.Array.sum(plan_estimates);
                 });
-                epic_plan_est_total += Ext.Array.sum(plan_estimates);
             });
-        });
-
-        console.log('epic_plan_est_total',epic_plan_est_total);
-
-        Ext.Object.each(hash, function(project_oid, project_set){
-            var project = project_set.project;
-            Ext.Object.each(project_set.records, function(epic_oid, epic_set){
-                var epic = epic_set.epic;
-                console.log('epic',epic);
-                var plan_estimates = Ext.Array.map(epic_set.records, function(record){
-                    var size = record.get('PlanEstimate') || 0;
-                    return 1000 * size;
-                });
-                
-                // var epic_size = 0;
-                // var epic_percentage = -1;
-                
-                // if ( epic && epic.LeafStoryPlanEstimateTotal > 0) {
-                //     epic_size = 1000 * epic.LeafStoryPlanEstimateTotal;
-                //     epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_size;
-                // }
-
-                epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_plan_est_total;
-                
-                var row = {
-                    Project: project,
-                    ProjectName: project.Name,
-                    Epic: epic,
-                    EpicName: epic.Name,
-                    EpicOID: epic_oid,
-                    EpicPercentage: epic_percentage,
-                    Records: epic_set.records,
-                    PlanEstimate: Ext.Array.sum(plan_estimates) / 1000,
-                    c_ExtID01TPR: epic.c_ExtID01TPR
-                };
-                
-                rows.push(row);
-            });
-        });
         
+            Ext.Object.each(hash, function(project_oid, project_set){
+                var project = project_set.project;
+                Ext.Object.each(project_set.records, function(epic_oid, epic_set){
+                    var epic = epic_set.epic;
+                    console.log('epic',epic);
+                    var plan_estimates = Ext.Array.map(epic_set.records, function(record){
+                        var size = record.get('PlanEstimate') || 0;
+                        return 1000 * size;
+                    });
+                 
+                    epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_plan_est_total;
+                    
+                    var row = {
+                        Project: project,
+                        ProjectName: project.Name,
+                        Epic: epic,
+                        EpicName: epic.Name,
+                        EpicOID: epic_oid,
+                        EpicPercentage: epic_percentage,
+                        Records: epic_set.records,
+                        PlanEstimate: Ext.Array.sum(plan_estimates) / 1000,
+                        c_ExtID01TPR: epic.c_ExtID01TPR,
+                        Iteration: iteration_name
+                    };
+                    
+                    rows.push(row);
+                });
+            });
+        });
         return rows;
     },
     
     _arrangeRecordsByProjectAndEpic: function(records) {
-        var records_by_project = {};
+        this.logger.log('_arrangeRecordsByProjectAndEpic',records);
+        
+        var records_by_iteration = {};
+        
+        var records_by_iteration_by_project = {};
         Ext.Array.each(records, function(record){
-            var project = record.get('Project');
-            var epic = { FormattedID:"", Name:"None", ObjectID:-1 };
-            var feature = record.get('Feature');
+            records_by_iteration = Ext.Object.merge(records_by_iteration, record);
             
-            if ( !Ext.isEmpty(feature) && !Ext.isEmpty(feature.Parent) ) {
-                epic = feature.Parent;
-            }
-            
-            var project_oid = project.ObjectID;
-            var epic_oid = epic.ObjectID;
-            
-            if ( Ext.isEmpty(records_by_project[project_oid]) ) {
-                records_by_project[project_oid] = {
-                    project: project,
-                    records: {}
-                };
-            }
-            
-            if ( Ext.isEmpty( records_by_project[project_oid]['records'][epic_oid] )) {
-                records_by_project[project_oid]['records'][epic_oid] = {
-                    epic: epic,
-                    records:[]
-                };
-            }
-            
-            records_by_project[project_oid]['records'][epic_oid].records.push(record);
         });
         
-        return records_by_project;
+        var records_by_project = {};
+            
+        Ext.Object.each(records_by_iteration, function(iteration_name, iteration_records){
+            Ext.Array.each(iteration_records, function(record){
+                var project = record.get('Project');
+                var epic = { FormattedID:"", Name:"None", ObjectID:-1 };
+                var feature = record.get('Feature');
+                
+                if ( !Ext.isEmpty(feature) && !Ext.isEmpty(feature.Parent) ) {
+                    epic = feature.Parent;
+                }
+                
+                var project_oid = project.ObjectID;
+                var epic_oid = epic.ObjectID;
+                
+                if ( Ext.isEmpty(records_by_project[project_oid]) ) {
+                    records_by_project[project_oid] = {
+                        project: project,
+                        records: {}
+                    };
+                }
+                
+                if ( Ext.isEmpty( records_by_project[project_oid]['records'][epic_oid] )) {
+                    records_by_project[project_oid]['records'][epic_oid] = {
+                        epic: epic,
+                        records:[]
+                    };
+                }
+                
+                records_by_project[project_oid]['records'][epic_oid].records.push(record);
+            });
+            records_by_iteration_by_project[iteration_name] = records_by_project;
+        });
+        
+        return records_by_iteration_by_project;
     },
     
+    _getStoriesInIterations: function(iterations) {
+        var me = this;
+        var promises = Ext.Array.map(iterations, function(iteration){
+            return function() { return me._getStoriesInIteration(iteration); }
+        });
+        
+        return Deft.Chain.sequence(promises, this);
+    },
     _getStoriesInIteration: function(iteration) {
+        this.logger.log('_getStoriesInIteration', iteration);
+        var deferred = Ext.create('Deft.Deferred');
+        
         var filters = [{property:'Iteration.Name',value:iteration.get('Name')}];
         
         var config = {
             model:'HierarchicalRequirement',
-            fetch:['FormattedID','Name','PlanEstimate','Project','Feature','Parent','ObjectID','c_ExtID01TPR','LeafStoryPlanEstimateTotal'],
+            fetch:['FormattedID','Name','PlanEstimate','Project','Feature','Parent','ObjectID','c_ExtID01TPR',
+                'LeafStoryPlanEstimateTotal','Iteration'],
             filters: filters,
             limit: Infinity
         };
         
-        return this._loadWsapiRecords(config);
+        this._loadWsapiRecords(config).then({
+            success: function(stories) {
+                var response = {};
+                response[iteration.get('Name')] = stories;
+                deferred.resolve(response);
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            },
+            scope: this
+        });
+        return deferred.promise;
     },
       
     _loadWsapiRecords: function(config){
@@ -935,6 +1027,11 @@ Ext.define("TSEpicIterationReport", {
     margin-top: 25px;
     margin-right: 5px;
     cursor: pointer;
+}
+
+
+.x-border-layout-ct {
+    background-color: #ffffff;
 }
     </style>
 

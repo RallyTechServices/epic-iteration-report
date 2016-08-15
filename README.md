@@ -2,6 +2,13 @@
 
 REQUIRES a custom field AND is hardcoded to read Feature as lowest level PI.
 
+[screenshot](./images/screenshot.png "screenshot")
+
+Allows for multiple iterations to be chosen.
+
+For an iteration, find the stories that belong to an iteration and to an epic.  Total all the stories up, then determine the percentage of the iteration overall is being done by each team by epic.  
+
+
 ## Development Notes
 
 ### First Load

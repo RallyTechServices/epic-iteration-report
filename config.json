@@ -1,5 +1,6 @@
 {
     "name": "Epic Iteration Report",
     "sdk": "2.1",
-    "className": "TSEpicIterationReport"
+    "className": "TSEpicIterationReport",
+    "story": "US170,US582"
 }
