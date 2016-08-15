@@ -3,12 +3,12 @@
 <head>
     <title>Epic Iteration Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Sun Aug 14 2016 19:01:17 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Aug 14 2016 19:30:49 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Aug 14 2016 19:01:17 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Sun Aug 14 2016 19:30:49 GMT-0700 (PDT)";
         var BUILDER = "jmartin";
-        var CHECKSUM = 21644051877;
+        var CHECKSUM = 25388968083;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -638,21 +638,53 @@ Ext.define("TSEpicIterationReport", {
     defaults: { margin: 10 },
     
     layout:'border',
-    
-    items: [
-        {xtype:'container',itemId:'selector_box',region:'north', layout: 'hbox'},
-        {xtype:'container',itemId:'display_box', region:'center', layout:'fit'}
-    ],
 
     integrationHeaders : {
         name : "TSEpicIterationReport"
     },
 
     launch: function() {
-        this._addSelectors(this.down('#selector_box'));
+        this._addComponents();
     },
     
-    _addSelectors: function(container) {
+    _addComponents: function(container) {
+        this.removeAll();
+        
+        this.headerContainer = this.add({
+            xtype:'container',
+            itemId:'header-ct',
+            region:'north',
+            layout: { type:'hbox' }
+        });
+        
+        this.displayContainer = this.add({
+            xtype:'container',
+            region:'center',
+            layout: 'fit',
+            itemId:'body-ct'
+        });
+        
+        if ( this.getSetting('showScopeSelector') || this.getSetting('showScopeSelector') == "true" ) {
+            this.headerContainer.add({
+                xtype:'tsmultiprojectpicker',
+                listeners: {
+                    change: function(picker,projects) {
+                        this._changeProjects(picker,projects);
+                        this._publishProjects();
+                    },
+                    scope: this
+                }
+            });
+            this.subscribe(this, 'requestProjects', this._publishProjects, this);
+        } else {
+            this.subscribe(this,'projectsChanged',this._changeProjects,this);
+            this.publish('requestProjects',this);
+        }
+        this._addSelectors(this.headerContainer);
+    },
+    
+    _addSelectors:function(container){
+        
         container.add({
             xtype:'rallymultiobjectpicker',
             modelType:'Iteration',
@@ -692,9 +724,25 @@ Ext.define("TSEpicIterationReport", {
         
     },
     
-    _updateData: function(cb) {
-        cb.collapse();
-        var iterations = cb.getValue();
+    _changeProjects: function(picker,projects) {
+        this.projects = projects;
+        this.displayContainer.removeAll();
+        this._updateData();
+    },
+    
+    _publishProjects: function() {
+        this.publish('projectsChanged',this.down('tsmultiprojectpicker'), this.projects || []);
+    },
+    
+    _updateData: function() {
+        var cb = this.down('rallymultiobjectpicker');
+        var iterations = [];
+        
+        if ( cb ) {
+            cb.collapse();
+            iterations = cb.getValue();
+        }
+        
         this.down('#export_button').setDisabled(true);
 
         if ( iterations.length === 0 ) { return; }
@@ -716,7 +764,7 @@ Ext.define("TSEpicIterationReport", {
     },
     
     _makeGrid: function(rows) {
-        var container = this.down('#display_box');
+        var container = this.displayContainer;
         
         container.removeAll();
         
@@ -752,6 +800,7 @@ Ext.define("TSEpicIterationReport", {
             );
         }});
         
+        columns.push({dataIndex:'EpicState', text:'State'});
         columns.push({dataIndex:'PlanEstimate', text:'Sum of Estimates'});
         
         if ( this.getSetting('showEpicPercentage') ) {
@@ -794,7 +843,7 @@ Ext.define("TSEpicIterationReport", {
                         return 1000 * size;
                     });
                  
-                    epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_plan_est_total;
+                    var epic_percentage = 100 * Ext.Array.sum(plan_estimates) / epic_plan_est_total;
                     
                     var row = {
                         Project: project,
@@ -866,25 +915,48 @@ Ext.define("TSEpicIterationReport", {
     
     _getStoriesInIterations: function(iterations) {
         var me = this;
+        var project_oids = [];
+        if ( !Ext.isEmpty(this.projects) && this.projects.length > 0 ) {
+            project_oids = Ext.Array.map(this.projects, function(project){
+                return project.ObjectID;
+            });
+        }
+        
         var promises = Ext.Array.map(iterations, function(iteration){
-            return function() { return me._getStoriesInIteration(iteration); }
+            return function() { return me._getStoriesInIteration(iteration,project_oids); }
         });
         
         return Deft.Chain.sequence(promises, this);
     },
-    _getStoriesInIteration: function(iteration) {
+    
+    _getStoriesInIteration: function(iteration,project_oids) {
         this.logger.log('_getStoriesInIteration', iteration);
         var deferred = Ext.create('Deft.Deferred');
         
-        var filters = [{property:'Iteration.Name',value:iteration.get('Name')}];
+        var iteration_filters = Rally.data.wsapi.Filter.and(
+            [{property:'Iteration.Name',value:iteration.get('Name')}]
+        );
+        
+        var project_filters = Rally.data.wsapi.Filter.or(
+            Ext.Array.map(project_oids,function(oid){
+                return {property:'Project.ObjectID',value:oid};
+            })
+        );
         
         var config = {
             model:'HierarchicalRequirement',
-            fetch:['FormattedID','Name','PlanEstimate','Project','Feature','Parent','ObjectID','c_ExtID01TPR',
-                'LeafStoryPlanEstimateTotal','Iteration'],
-            filters: filters,
+            fetch:['FormattedID','Name','PlanEstimate','Project',
+                'Feature','Parent','ObjectID','c_ExtID01TPR',
+                'LeafStoryPlanEstimateTotal','State','Iteration'],
             limit: Infinity
         };
+        
+        if ( Ext.isEmpty(project_oids) || project_oids.length === 0 ) {
+            config.filters = iteration_filters;
+        } else {
+            config.context = { project: null };
+            config.filters = iteration_filters.and(project_filters);
+        }
         
         this._loadWsapiRecords(config).then({
             success: function(stories) {
@@ -974,8 +1046,19 @@ Ext.define("TSEpicIterationReport", {
     getSettingsFields: function() {
         var check_box_margins = '0 0 10 10';
         
-        
+        var type_filters = Rally.data.wsapi.Filter.or([
+            {property: 'TypePath', value: 'HierarchicalRequirement'},
+            {property: 'TypePath', operator: 'contains', value: 'PortfolioItem/'}
+        ]);
+
         return [{
+            name: 'showScopeSelector',
+            xtype: 'rallycheckboxfield',
+            boxLabelAlign: 'after',
+            fieldLabel: '',
+            margin: check_box_margins,
+            boxLabel: 'Show Project Selector'
+        },{
             name: 'showEpicPercentage',
             xtype: 'rallycheckboxfield',
             boxLabelAlign: 'after',
