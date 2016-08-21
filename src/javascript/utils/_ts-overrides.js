@@ -18,7 +18,7 @@ Ext.override(Rally.ui.picker.MultiObjectPicker,{
         
         var storeConfig = Ext.merge({
             model: this.modelType,
-            filters: [{property:'EndDate',operator:'<',value:Rally.util.DateTime.toIsoString(new Date())}]
+           // filters: [{property:'EndDate',operator:'<',value:Rally.util.DateTime.toIsoString(new Date())}]
         }, this.storeConfig);
         
         storeConfig.remoteGroup  = true;
