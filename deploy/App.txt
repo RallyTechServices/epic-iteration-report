@@ -3,12 +3,12 @@
 <head>
     <title>Epic Iteration Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Sat Aug 20 2016 18:27:03 GMT-0700 (PDT) -->
+    <!--  Build Date: Sat Aug 20 2016 18:57:17 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Aug 20 2016 18:27:03 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Sat Aug 20 2016 18:57:17 GMT-0700 (PDT)";
         var BUILDER = "jmartin";
-        var CHECKSUM = 45738123463;
+        var CHECKSUM = 47182719340;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1039,6 +1039,20 @@ Ext.define('CA.technicalservices.ProjectPickerDialog',{
     
 });
 Ext.override(Rally.ui.picker.MultiObjectPicker,{
+    getRightListHtml: function (recordData) {
+        console.log('--', recordData);
+        
+        var format = 'm/d/Y';
+        
+        var formattedStartDate = Ext.util.Format.date(recordData.StartDate, format);
+        var formattedEndDate = Ext.util.Format.date(recordData.EndDate, format);
+
+        console.log('  ', formattedStartDate, formattedEndDate);
+        
+        var return_value = Ext.String.format(" <div class='timebox-dates adjust-right'>{0} - {1}</div>", formattedStartDate, formattedEndDate);
+        return return_value;
+    },
+    
     createStore: function () {
         var deferred = Ext.create('Deft.Deferred');
         
@@ -1136,7 +1150,7 @@ Ext.define("TSEpicIterationReport", {
             modelType:'Iteration',
             fieldLabel: 'Iteration:',
             labelWidth: 55,
-            width: 200,
+            width: 400,
             storeConfig: {
                 context: {
                     projectScopeUp: false,
@@ -1559,6 +1573,11 @@ Ext.define("TSEpicIterationReport", {
     cursor: pointer;
 }
 
+.adjust-right {
+    float: right;
+    padding-left: 2px;
+    padding-right: 5px;
+}
 
 .x-border-layout-ct {
     background-color: #ffffff;

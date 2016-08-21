@@ -1,4 +1,18 @@
 Ext.override(Rally.ui.picker.MultiObjectPicker,{
+    getRightListHtml: function (recordData) {
+        console.log('--', recordData);
+        
+        var format = 'm/d/Y';
+        
+        var formattedStartDate = Ext.util.Format.date(recordData.StartDate, format);
+        var formattedEndDate = Ext.util.Format.date(recordData.EndDate, format);
+
+        console.log('  ', formattedStartDate, formattedEndDate);
+        
+        var return_value = Ext.String.format(" <div class='timebox-dates adjust-right'>{0} - {1}</div>", formattedStartDate, formattedEndDate);
+        return return_value;
+    },
+    
     createStore: function () {
         var deferred = Ext.create('Deft.Deferred');
         

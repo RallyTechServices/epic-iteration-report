@@ -16,6 +16,11 @@
     cursor: pointer;
 }
 
+.adjust-right {
+    float: right;
+    padding-left: 2px;
+    padding-right: 5px;
+}
 
 .x-border-layout-ct {
     background-color: #ffffff;
