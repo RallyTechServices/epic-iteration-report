@@ -3,12 +3,12 @@
 <head>
     <title>Epic Iteration Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Sat Aug 20 2016 18:10:26 GMT-0700 (PDT) -->
+    <!--  Build Date: Sat Aug 20 2016 18:27:03 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Aug 20 2016 18:10:26 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Sat Aug 20 2016 18:27:03 GMT-0700 (PDT)";
         var BUILDER = "jmartin";
-        var CHECKSUM = 45382353721;
+        var CHECKSUM = 45738123463;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1269,7 +1269,6 @@ Ext.define("TSEpicIterationReport", {
         Ext.Object.each(records_by_iteration_by_project, function(iteration_name,hash){
             var epic_plan_est_total = 0;
             Ext.Object.each(hash, function(project_oid, project_set){
-                var project = project_set.project;
                 Ext.Object.each(project_set.records, function(epic_oid, epic_set){
                     var plan_estimates = Ext.Array.map(epic_set.records, function(record){
                         var size = record.get('PlanEstimate') || 0;
@@ -1283,7 +1282,7 @@ Ext.define("TSEpicIterationReport", {
                 var project = project_set.project;
                 Ext.Object.each(project_set.records, function(epic_oid, epic_set){
                     var epic = epic_set.epic;
-                    console.log('epic',epic);
+
                     var plan_estimates = Ext.Array.map(epic_set.records, function(record){
                         var size = record.get('PlanEstimate') || 0;
                         return 1000 * size;
@@ -1300,6 +1299,7 @@ Ext.define("TSEpicIterationReport", {
                         EpicState: epic.State && epic.State._refObjectName,
                         Records: epic_set.records,
                         PlanEstimate: Ext.Array.sum(plan_estimates) / 1000,
+                        EpicPercentage: epic_percentage,
                         c_ExtID01TPR: epic.c_ExtID01TPR,
                         Iteration: iteration_name
                     };
@@ -1316,15 +1316,17 @@ Ext.define("TSEpicIterationReport", {
         
         var records_by_iteration = {};
         
-        var records_by_iteration_by_project = {};
         Ext.Array.each(records, function(record){
             records_by_iteration = Ext.Object.merge(records_by_iteration, record);
-            
         });
         
-        var records_by_project = {};
-            
+        this.logger.log('records_by_iteration',records_by_iteration);
+        
+        var records_by_iteration_by_project = {};
+
         Ext.Object.each(records_by_iteration, function(iteration_name, iteration_records){
+            var records_by_project = {};
+
             Ext.Array.each(iteration_records, function(record){
                 var project = record.get('Project');
                 var epic = { FormattedID:"", Name:"None", ObjectID:-1 };
@@ -1350,12 +1352,12 @@ Ext.define("TSEpicIterationReport", {
                         records:[]
                     };
                 }
-                
                 records_by_project[project_oid]['records'][epic_oid].records.push(record);
             });
             records_by_iteration_by_project[iteration_name] = records_by_project;
         });
         
+        console.log('records_by_iteration_by_project',records_by_iteration_by_project);
         return records_by_iteration_by_project;
     },
     
