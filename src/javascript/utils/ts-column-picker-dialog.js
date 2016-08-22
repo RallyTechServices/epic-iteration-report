@@ -109,7 +109,6 @@ Ext.define('CA.technicalservices.ColumnPickerDialog',{
                 
         var store = Ext.create('Rally.data.custom.Store',{
             data: this.pickableColumns,
-            sorters: [{property:'text'}],
             pageSize: 500
         });
         

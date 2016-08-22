@@ -13,6 +13,28 @@ Ext.define("TSEpicIterationReport", {
     pickableColumns: null,
     epicFields: [],
     
+    stateful: true,
+    stateEvents: ['columnschosen','columnmoved','columnresize'],
+    stateId: 'CA.technicalservices.iterationreport.settings',
+    
+    getState: function() {
+        var me = this,
+            state = null;
+
+        var columns = Ext.Array.map( this.pickableColumns, function(col){
+            var column = Ext.clone(col);
+            console.log(col.fieldName, col.hidden);
+            column.renderer = null;
+            return column;
+        });
+        
+        state = {
+            pickableColumns: columns
+        };
+
+        return state;
+    },
+    
     launch: function() {
         this._getEpicFields().then({
             success: function(fields) {
@@ -71,6 +93,8 @@ Ext.define("TSEpicIterationReport", {
                 scope: this,
                 columnschosen: function(button,columns) {
                     this.pickableColumns = columns;
+                    this.fireEvent('columnschosen');
+
                     this._updateData();
                 }
             }
@@ -515,9 +539,7 @@ Ext.define("TSEpicIterationReport", {
                 
         if ( ! this.epicFields ) { return columns; }
         
-        columns = Ext.Array.map(this.epicFields, function(field){
-            console.log(field.name, field);
-            
+        columns = Ext.Array.map(this.epicFields, function(field){            
             return {
                 hidden: true,
                 dataIndex: 'Epic',
@@ -534,7 +556,7 @@ Ext.define("TSEpicIterationReport", {
                 }
             };
         });
-        
+     
         if ( ! this.pickableColumns ) { return columns; }
 
         var pickable_by_index = {};
@@ -580,6 +602,12 @@ Ext.define("TSEpicIterationReport", {
                         }
                     }
                     field_list.push( field );
+                });
+
+                field_list = Ext.Array.sort(field_list, function(a,b){
+                    if ( a.DisplayName < b.DisplayName ) { return 1; }
+                    if ( a.DisplayName > b.DisplayName ) { return -1; }
+                    return 0;    
                 });
                 deferred.resolve(field_list);
             }
