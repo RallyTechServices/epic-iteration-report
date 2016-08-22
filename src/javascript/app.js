@@ -10,8 +10,20 @@ Ext.define("TSEpicIterationReport", {
         name : "TSEpicIterationReport"
     },
 
+    pickableColumns: null,
+    epicFields: [],
+    
     launch: function() {
-        this._addComponents();
+        this._getEpicFields().then({
+            success: function(fields) {
+                this.epicFields = fields;
+                this._addComponents();
+            },
+            failure: function(msg) {
+                Ext.Msg.alert('',msg);
+            },
+            scope: this
+        });
     },
     
     _addComponents: function(container) {
@@ -51,6 +63,18 @@ Ext.define("TSEpicIterationReport", {
     },
     
     _addSelectors:function(container){
+        
+        container.add({
+            xtype:'tscolumnpickerbutton',
+            pickableColumns: this._getPickableColumns(),
+            listeners: {
+                scope: this,
+                columnschosen: function(button,columns) {
+                    this.pickableColumns = columns;
+                    this._updateData();
+                }
+            }
+        });
         
         container.add({
             xtype:'rallymultiobjectpicker',
@@ -155,30 +179,12 @@ Ext.define("TSEpicIterationReport", {
     },
     
     _getColumns: function() {
-        var columns = [];
+        var columns = Ext.Array.merge([], this._getBaseLeftColumns());
         
-        columns.push({ dataIndex:'ProjectName',  text:'Project' });
+        columns = Ext.Array.merge(columns, this._getPickableColumns());
         
-        columns.push({ dataIndex:'EpicOID', text:'Epic', flex: 1, renderer: function(value, meta, record) {
-            if ( value == -1 ) { return ""; }
-            return Ext.String.format("{0}: {1}", 
-                record.get('Epic').FormattedID,
-                record.get('Epic').Name
-            );
-        }});
-        
-        columns.push({dataIndex:'EpicState', text:'State'});
-        columns.push({dataIndex:'PlanEstimate', text:'Sum of Estimates'});
-        
-        if ( this.getSetting('showEpicPercentage') ) {
-            columns.push({dataIndex:'EpicPercentage', text: 'Epic %', renderer: function(value, meta, record){
-                if ( !Ext.isNumber(value) || value < 0 ) { return "N/A"; }
-                return Ext.util.Format.number(value, '0.##') + "%";
-            }});
-        }
-        columns.push({dataIndex:'c_ExtID01TPR', text:'ExtID: 01 - TPR'});
-        
-        columns.push({dataIndex:'Iteration',text:'Iteration'});
+        columns = Ext.Array.merge(columns, this._getBaseRightColumns());
+
         return columns;
     },
     
@@ -278,7 +284,7 @@ Ext.define("TSEpicIterationReport", {
             records_by_iteration_by_project[iteration_name] = records_by_project;
         });
         
-        console.log('records_by_iteration_by_project',records_by_iteration_by_project);
+
         return records_by_iteration_by_project;
     },
     
@@ -298,6 +304,19 @@ Ext.define("TSEpicIterationReport", {
         return Deft.Chain.sequence(promises, this);
     },
     
+    _getFetchFields: function() {
+        var fields = ['FormattedID','Name','PlanEstimate','Project',
+            'Feature','Parent','ObjectID','c_ExtID01TPR',
+            'LeafStoryPlanEstimateTotal','State','Iteration'];
+        Ext.Array.each(this._getPickableColumns(), function(column) {
+            if ( !column.hidden ) {
+                fields.push(column.fieldName);
+            }
+        });
+        
+        return fields;
+    },
+    
     _getStoriesInIteration: function(iteration,project_oids) {
         this.logger.log('_getStoriesInIteration', iteration);
         var deferred = Ext.create('Deft.Deferred');
@@ -314,9 +333,7 @@ Ext.define("TSEpicIterationReport", {
         
         var config = {
             model:'HierarchicalRequirement',
-            fetch:['FormattedID','Name','PlanEstimate','Project',
-                'Feature','Parent','ObjectID','c_ExtID01TPR',
-                'LeafStoryPlanEstimateTotal','State','Iteration'],
+            fetch: this._getFetchFields(),
             limit: Infinity
         };
         
@@ -451,5 +468,123 @@ Ext.define("TSEpicIterationReport", {
         this.logger.log('onSettingsUpdate',settings);
         // Ext.apply(this, settings);
         this.launch();
+    },
+    
+    _setPickableColumns: function(pickable_columns) {
+        var columns = Ext.Array.merge([], this._getBaseLeftColumns());
+        columns = Ext.Array.merge(columns, pickable_columns);
+        columns = Ext.Array.merge(columns, this._getBaseRightColumns());
+    },
+    
+    _getBaseLeftColumns:function() {
+        var columns = [];
+        
+        columns.push({ dataIndex:'ProjectName',  text:'Project' });
+        
+        columns.push({ dataIndex:'EpicOID', text:'Epic', flex: 1, renderer: function(value, meta, record) {
+            if ( value == -1 ) { return ""; }
+            return Ext.String.format("{0}: {1}", 
+                record.get('Epic').FormattedID,
+                record.get('Epic').Name
+            );
+        }});
+        
+        return columns;
+    },
+    
+    _getBaseRightColumns: function() {
+        var columns = [];
+        
+        columns.push({dataIndex:'PlanEstimate', text:'Sum of Estimates'});
+        
+        if ( this.getSetting('showEpicPercentage') ) {
+            columns.push({dataIndex:'EpicPercentage', text: 'Epic %', renderer: function(value, meta, record){
+                if ( !Ext.isNumber(value) || value < 0 ) { return "N/A"; }
+                return Ext.util.Format.number(value, '0.##') + "%";
+            }});
+        }
+        columns.push({dataIndex:'c_ExtID01TPR', text:'ExtID: 01 - TPR'});
+        
+        columns.push({dataIndex:'Iteration',text:'Iteration'});
+        return columns;
+    },
+    
+    _getPickableColumns: function() {
+        var columns = [],
+            me = this;
+                
+        if ( ! this.epicFields ) { return columns; }
+        
+        columns = Ext.Array.map(this.epicFields, function(field){
+            console.log(field.name, field);
+            
+            return {
+                hidden: true,
+                dataIndex: 'Epic',
+                text:      field.displayName,
+                fieldName: field.name,
+                renderer: function(value,meta,record) {
+                    if ( Ext.isEmpty(value) || Ext.isEmpty(value[field.name]) ) {
+                        return "";
+                    }
+                    if ( Ext.isObject(value[field.name]) ) {
+                        return value[field.name]._refObjectName;
+                    }
+                    return value[field.name];
+                }
+            };
+        });
+        
+        if ( ! this.pickableColumns ) { return columns; }
+
+        var pickable_by_index = {};
+        Ext.Array.each(this.pickableColumns, function(column){
+            pickable_by_index[column.fieldName] = column;
+        });
+        
+        return Ext.Array.map(columns, function(column){
+            var pickable = pickable_by_index[column.fieldName];
+            if ( Ext.isEmpty(pickable) ) { return column; }
+            
+            if ( pickable.hidden ) { 
+                column.hidden = true;
+            } else {
+                column.hidden = false;
+            }
+            
+            return column;
+            
+        });
+    },
+    
+    _getEpicFields: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        Rally.data.ModelFactory.getModel({
+            type: 'PortfolioItem',
+            success: function(model) {
+                var field_list = [];
+                var fields_to_skip = ["ObjectID","ObjectUUID","VersionId","DragAndDropRank","FormattedID","Name"];
+               
+                Ext.Array.each( model.getFields(), function(field) {
+                    if ( field.hidden ) { 
+                        return;
+                    }
+                    
+                    if ( Ext.Array.contains(fields_to_skip,field.name) ) {
+                        return;
+                    }
+                    
+                    if ( field.attributeDefinition ) {
+                        if ( field.attributeDefinition.AttributeType == "COLLECTION" ||  field.attributeDefinition.AttributeType == "TEXT") {
+                            return ;
+                        }
+                    }
+                    field_list.push( field );
+                });
+                deferred.resolve(field_list);
+            }
+        });
+        return deferred.promise;
     }
+    
 });
