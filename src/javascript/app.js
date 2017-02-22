@@ -23,7 +23,6 @@ Ext.define("TSEpicIterationReport", {
 
         var columns = Ext.Array.map( this.pickableColumns, function(col){
             var column = Ext.clone(col);
-            console.log(col.fieldName, col.hidden);
             column.renderer = null;
             return column;
         });
@@ -35,6 +34,11 @@ Ext.define("TSEpicIterationReport", {
         return state;
     },
     
+    config: {
+        defaultSettings: {
+        }
+    },  
+
     launch: function() {
         this._getEpicFields().then({
             success: function(fields) {
@@ -85,7 +89,6 @@ Ext.define("TSEpicIterationReport", {
     },
     
     _addSelectors:function(container){
-        
         container.add({
             xtype:'tscolumnpickerbutton',
             pickableColumns: this._getPickableColumns(),
@@ -94,7 +97,6 @@ Ext.define("TSEpicIterationReport", {
                 columnschosen: function(button,columns) {
                     this.pickableColumns = columns;
                     this.fireEvent('columnschosen');
-
                     this._updateData();
                 }
             }
@@ -475,6 +477,19 @@ Ext.define("TSEpicIterationReport", {
             fieldLabel: '',
             margin: check_box_margins,
             boxLabel: 'Show percentage of story points for epic are in the sprint'
+        },
+        {
+            xtype:'tscolumnpickerbutton',
+            pickableColumns: this._getPickableColumns(),
+            margin: '0 0 300 10',
+            listeners: {
+                scope: this,
+                columnschosen: function(button,columns) {
+                    this.pickableColumns = columns;
+                    // this.fireEvent('columnschosen');
+                    // this._updateData();
+                }
+            }
         }];
     },
     
@@ -536,7 +551,7 @@ Ext.define("TSEpicIterationReport", {
     _getPickableColumns: function() {
         var columns = [],
             me = this;
-                
+               
         if ( ! this.epicFields ) { return columns; }
         
         columns = Ext.Array.map(this.epicFields, function(field){            

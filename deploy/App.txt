@@ -3,12 +3,12 @@
 <head>
     <title>Epic Iteration Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Sun Aug 21 2016 20:59:48 GMT-0700 (PDT) -->
+    <!--  Build Date: Wed Feb 22 2017 11:00:41 GMT-0800 (PST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Aug 21 2016 20:59:48 GMT-0700 (PDT)";
-        var BUILDER = "jmartin";
-        var CHECKSUM = 69113387683;
+        var APP_BUILD_DATE = "Wed Feb 22 2017 11:00:41 GMT-0800 (PST)";
+        var BUILDER = "arajaraman";
+        var CHECKSUM = 69955478244;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1326,7 +1326,6 @@ Ext.define("TSEpicIterationReport", {
 
         var columns = Ext.Array.map( this.pickableColumns, function(col){
             var column = Ext.clone(col);
-            console.log(col.fieldName, col.hidden);
             column.renderer = null;
             return column;
         });
@@ -1338,6 +1337,11 @@ Ext.define("TSEpicIterationReport", {
         return state;
     },
     
+    config: {
+        defaultSettings: {
+        }
+    },  
+
     launch: function() {
         this._getEpicFields().then({
             success: function(fields) {
@@ -1388,7 +1392,6 @@ Ext.define("TSEpicIterationReport", {
     },
     
     _addSelectors:function(container){
-        
         container.add({
             xtype:'tscolumnpickerbutton',
             pickableColumns: this._getPickableColumns(),
@@ -1397,7 +1400,6 @@ Ext.define("TSEpicIterationReport", {
                 columnschosen: function(button,columns) {
                     this.pickableColumns = columns;
                     this.fireEvent('columnschosen');
-
                     this._updateData();
                 }
             }
@@ -1778,6 +1780,19 @@ Ext.define("TSEpicIterationReport", {
             fieldLabel: '',
             margin: check_box_margins,
             boxLabel: 'Show percentage of story points for epic are in the sprint'
+        },
+        {
+            xtype:'tscolumnpickerbutton',
+            pickableColumns: this._getPickableColumns(),
+            margin: '0 0 300 10',
+            listeners: {
+                scope: this,
+                columnschosen: function(button,columns) {
+                    this.pickableColumns = columns;
+                    // this.fireEvent('columnschosen');
+                    // this._updateData();
+                }
+            }
         }];
     },
     
@@ -1839,7 +1854,7 @@ Ext.define("TSEpicIterationReport", {
     _getPickableColumns: function() {
         var columns = [],
             me = this;
-                
+               
         if ( ! this.epicFields ) { return columns; }
         
         columns = Ext.Array.map(this.epicFields, function(field){            
