@@ -12,6 +12,7 @@ Ext.define("TSEpicIterationReport", {
 
     pickableColumns: null,
     epicFields: [],
+    fields_to_skip: ["ObjectID","ObjectUUID","VersionId","DragAndDropRank","FormattedID","Name"],
     
     stateful: true,
     stateEvents: ['columnschosen','columnmoved','columnresize'],
@@ -89,9 +90,11 @@ Ext.define("TSEpicIterationReport", {
     },
     
     _addSelectors:function(container){
+        var me = this;
+        console.log('setting picks showColumnPicker>>', me.getSetting('showColumnPicker'));
         container.add({
             xtype:'tscolumnpickerbutton',
-            pickableColumns: this._getPickableColumns(),
+            pickableColumns: this.pickableColumns,
             listeners: {
                 scope: this,
                 columnschosen: function(button,columns) {
@@ -214,6 +217,9 @@ Ext.define("TSEpicIterationReport", {
         return columns;
     },
     
+
+
+
     _makeRows: function(records_by_iteration_by_project) {
         this.logger.log('records_by_iteration_by_project',records_by_iteration_by_project);
 
@@ -456,41 +462,61 @@ Ext.define("TSEpicIterationReport", {
     },
     
     getSettingsFields: function() {
+        var me = this;
         var check_box_margins = '0 0 10 10';
         
-        var type_filters = Rally.data.wsapi.Filter.or([
-            {property: 'TypePath', value: 'HierarchicalRequirement'},
-            {property: 'TypePath', operator: 'contains', value: 'PortfolioItem/'}
-        ]);
+        // var type_filters = Rally.data.wsapi.Filter.or([
+        //     {property: 'TypePath', value: 'HierarchicalRequirement'},
+        //     {property: 'TypePath', operator: 'contains', value: 'PortfolioItem/'}
+        // ]);
 
-        return [{
+        return [
+        
+        {
             name: 'showScopeSelector',
             xtype: 'rallycheckboxfield',
             boxLabelAlign: 'after',
             fieldLabel: '',
             margin: check_box_margins,
             boxLabel: 'Show Project Selector'
-        },{
+        },
+        {
             name: 'showEpicPercentage',
             xtype: 'rallycheckboxfield',
             boxLabelAlign: 'after',
             fieldLabel: '',
             margin: check_box_margins,
             boxLabel: 'Show percentage of story points for epic are in the sprint'
-        },
-        {
-            xtype:'tscolumnpickerbutton',
-            pickableColumns: this._getPickableColumns(),
-            margin: '0 0 300 10',
-            listeners: {
-                scope: this,
-                columnschosen: function(button,columns) {
-                    this.pickableColumns = columns;
-                    // this.fireEvent('columnschosen');
-                    // this._updateData();
-                }
-            }
-        }];
+        },{
+                xtype: 'rallyfieldpicker',
+                name: 'columnNames',
+                itemId: 'columnNames',
+                fieldLabel: 'Choose Fields',
+                width: 250,
+                margin: '0 0 300 10',    
+                autoExpand: true,
+                alwaysExpanded: true,
+                modelTypes: ['PortfolioItem'],
+                fieldBlackList: me.fields_to_skip
+        }
+
+        // ,
+        // {
+        //     name: 'showColumnPicker',
+        //     itemId: 'showColumnPicker',
+        //     xtype:'tscolumnpickerbutton',
+        //     pickableColumns: me._getPickableColumns(),
+        //     margin: '0 0 300 10',
+        //     listeners: {
+        //         scope: me,
+        //         columnschosen: function(button,columns) {
+        //             console.log('pickableColumns',columns);
+        //             me.colsFromSettings = columns;
+        //             me.fireEvent('columnschosen');
+        //         }
+        //     }
+        // }
+        ];
     },
     
     _launchInfo: function() {
@@ -551,7 +577,8 @@ Ext.define("TSEpicIterationReport", {
     _getPickableColumns: function() {
         var columns = [],
             me = this;
-               
+        var cols = me.getSetting('columnNames') && me.getSetting('columnNames').split(',') || [];
+
         if ( ! this.epicFields ) { return columns; }
         
         columns = Ext.Array.map(this.epicFields, function(field){            
@@ -583,31 +610,34 @@ Ext.define("TSEpicIterationReport", {
             var pickable = pickable_by_index[column.fieldName];
             if ( Ext.isEmpty(pickable) ) { return column; }
             
-            if ( pickable.hidden ) { 
-                column.hidden = true;
-            } else {
+            if ( !pickable.hidden ) { 
                 column.hidden = false;
+            } else if(Ext.Array.contains(cols,pickable.fieldName)) {
+                column.hidden = false;
+            }else{
+                column.hidden = true;
             }
             
             return column;
             
         });
     },
-    
+
+   
     _getEpicFields: function() {
+        var me = this;
         var deferred = Ext.create('Deft.Deferred');
         Rally.data.ModelFactory.getModel({
             type: 'PortfolioItem',
             success: function(model) {
                 var field_list = [];
-                var fields_to_skip = ["ObjectID","ObjectUUID","VersionId","DragAndDropRank","FormattedID","Name"];
                
                 Ext.Array.each( model.getFields(), function(field) {
                     if ( field.hidden ) { 
                         return;
                     }
                     
-                    if ( Ext.Array.contains(fields_to_skip,field.name) ) {
+                    if ( Ext.Array.contains(me.fields_to_skip,field.name) ) {
                         return;
                     }
                     
